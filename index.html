@@ -1328,6 +1328,16 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-slate-200">
             <h3 class="font-black text-slate-800 mb-1">Edit Session Week Topic</h3>
             <p class="text-xs text-slate-500 mb-4">Change the topic title to be discussed for the selected week.</p>
+
+            <div class="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                <label class="block text-[11px] font-bold text-slate-600 mb-1.5"><i class="fa-solid fa-calendar-week mr-1"></i> Week to edit (choose right here — no need to go back to the Speak Up Hour tab)</label>
+                <div class="flex flex-wrap gap-2">
+                    <select id="editTopicYearSelect" onchange="onEditTopicYearChange()" class="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none"></select>
+                    <select id="editTopicMonthSelect" onchange="onEditTopicMonthChange()" class="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none"></select>
+                    <select id="editTopicWeekSelect" onchange="onEditTopicWeekChange()" class="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-amber-500 outline-none"></select>
+                </div>
+            </div>
+
             <input type="text" id="editTopicInput" class="w-full text-xs p-3 border border-slate-300 rounded-xl mb-4 font-semibold focus:ring-2 focus:ring-rzorange-500 outline-none">
             <div class="flex justify-end gap-2">
                 <button type="button" onclick="document.getElementById('editTopicModal').classList.add('hidden')" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200">Cancel</button>
@@ -1586,6 +1596,16 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-4xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
             <h3 class="font-extrabold mb-2 text-slate-800"><i class="fa-solid fa-file-import text-blue-500 mr-2"></i>Bulk Import Vocabulary (Auto Parser)</h3>
             <p class="text-xs text-slate-500 mb-4">Paste your text directly here. The Smart Parser can read Word/Phonetic/Spelling format followed by a meaning and translation line (like the example below), OR a Tab/Column format copied from Excel.</p>
+
+            <div class="mb-4 p-3 bg-rzorange-50 border border-rzorange-100 rounded-xl">
+                <label class="block text-[11px] font-bold text-slate-600 mb-1.5"><i class="fa-solid fa-calendar-week mr-1"></i> Target Week (choose right here — no need to go back to the Speak Up Hour tab)</label>
+                <div class="flex flex-wrap gap-2">
+                    <select id="bulkYearSelect" onchange="onBulkYearChange()" class="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-rzorange-500 outline-none"></select>
+                    <select id="bulkMonthSelect" onchange="onBulkMonthChange()" class="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-rzorange-500 outline-none"></select>
+                    <select id="bulkWeekSelect" onchange="updateBulkTargetLabel()" class="bg-white border border-slate-300 text-xs rounded-xl px-3 py-2 font-bold text-slate-700 focus:ring-2 focus:ring-rzorange-500 outline-none"></select>
+                </div>
+            </div>
+
             <textarea id="bulkDataInput" rows="6" class="w-full text-xs p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-rzorange-500 mb-4" placeholder="Example format:&#10;Beneficiary/ˌben.əˈfɪʃ.i.er.i/ben-e-fish-i-er-i&#10;[local-language meaning]&#10;A person or group who derives advantage...&#10;More than 500 families became..."></textarea>
             
             <div class="flex justify-end mb-4">
@@ -6070,9 +6090,23 @@ const CHARACTERS = [
         }
 
         // --- ENGLISH HOUR LOGIC ---
+        // NOTE ON WEEK-SELECTOR PERSISTENCE:
+        // initDropdowns()/onYearChange()/onMonthChange() are called not just once on page
+        // load, but also every time the background cloud-sync poll refreshes the page
+        // (see startCloudPolling -> renderEverything -> initDropdowns) and after actions
+        // like submitting a Speak Up Hour report. Previously these functions rebuilt the
+        // <select> options from scratch with no "selected" match, which made the browser
+        // silently fall back to the FIRST option every time — i.e. Year 2026 / January /
+        // Week 1 — even if an Admin was actively working on a different week. That's the
+        // "always kembali ke January Week 1" bug. The fix below simply remembers whatever
+        // was selected right before the rebuild and re-applies it afterwards, so a refresh
+        // never changes what the Admin is looking at unless they change it themselves.
         function initDropdowns() {
-            const yrSel = document.getElementById("yearSelect"); yrSel.innerHTML = "";
+            const yrSel = document.getElementById("yearSelect");
+            const wantedYear = yrSel.value; // capture BEFORE clearing options
+            yrSel.innerHTML = "";
             YEARS.forEach(y => yrSel.appendChild(new Option(y, y, false, y==="2026")));
+            if (wantedYear && YEARS.includes(wantedYear)) yrSel.value = wantedYear;
             onYearChange();
             
             const now = new Date();
@@ -6104,14 +6138,20 @@ const CHARACTERS = [
         }
 
         function onYearChange() {
-            const moSel = document.getElementById("monthSelect"); moSel.innerHTML = "";
+            const moSel = document.getElementById("monthSelect");
+            const wantedMonth = moSel.value; // capture BEFORE clearing options
+            moSel.innerHTML = "";
             MONTH_NAMES.forEach(m => moSel.appendChild(new Option(m, m)));
+            if (wantedMonth && MONTH_NAMES.includes(wantedMonth)) moSel.value = wantedMonth;
             onMonthChange();
         }
 
         function onMonthChange() {
-            const wkSel = document.getElementById("weekSelect"); wkSel.innerHTML = "";
+            const wkSel = document.getElementById("weekSelect");
+            const wantedWeek = wkSel.value; // capture BEFORE clearing options
+            wkSel.innerHTML = "";
             WEEKS.forEach(w => wkSel.appendChild(new Option(w, w)));
+            if (wantedWeek && WEEKS.includes(wantedWeek)) wkSel.value = wantedWeek;
             renderTable();
         }
 
@@ -6281,11 +6321,44 @@ const CHARACTERS = [
         }
 
         // --- BULK IMPORT LOGIC ---
+        // The modal has its OWN Year/Month/Week selectors (bulkYearSelect/bulkMonthSelect/
+        // bulkWeekSelect) so an Admin can import vocab into ANY week without ever leaving
+        // this modal / bouncing back to the Speak Up Hour tab. They default to whatever the
+        // main page is currently showing, but can be changed freely inside the modal.
         function openBulkImportModal() {
             document.getElementById('bulkImportModal').classList.remove('hidden');
-            const yr = document.getElementById("yearSelect").value;
-            const mo = document.getElementById("monthSelect").value;
-            const wk = document.getElementById("weekSelect").value;
+
+            const yrSel = document.getElementById("bulkYearSelect");
+            yrSel.innerHTML = "";
+            YEARS.forEach(y => yrSel.appendChild(new Option(y, y)));
+            const mainYear = document.getElementById("yearSelect").value;
+            if (mainYear && YEARS.includes(mainYear)) yrSel.value = mainYear;
+
+            onBulkYearChange(document.getElementById("monthSelect").value, document.getElementById("weekSelect").value);
+        }
+
+        function onBulkYearChange(preferredMonth, preferredWeek) {
+            const moSel = document.getElementById("bulkMonthSelect");
+            const wantedMonth = preferredMonth !== undefined ? preferredMonth : moSel.value;
+            moSel.innerHTML = "";
+            MONTH_NAMES.forEach(m => moSel.appendChild(new Option(m, m)));
+            if (wantedMonth && MONTH_NAMES.includes(wantedMonth)) moSel.value = wantedMonth;
+            onBulkMonthChange(preferredWeek);
+        }
+
+        function onBulkMonthChange(preferredWeek) {
+            const wkSel = document.getElementById("bulkWeekSelect");
+            const wantedWeek = preferredWeek !== undefined ? preferredWeek : wkSel.value;
+            wkSel.innerHTML = "";
+            WEEKS.forEach(w => wkSel.appendChild(new Option(w, w)));
+            if (wantedWeek && WEEKS.includes(wantedWeek)) wkSel.value = wantedWeek;
+            updateBulkTargetLabel();
+        }
+
+        function updateBulkTargetLabel() {
+            const yr = document.getElementById("bulkYearSelect").value;
+            const mo = document.getElementById("bulkMonthSelect").value;
+            const wk = document.getElementById("bulkWeekSelect").value;
             document.getElementById("bulkTargetWeek").innerText = `${wk} - ${mo} ${yr}`;
         }
 
@@ -6400,9 +6473,9 @@ const CHARACTERS = [
                 alert('Please parse and preview valid data first!');
                 return;
             }
-            const yr = document.getElementById("yearSelect").value;
-            const mo = document.getElementById("monthSelect").value;
-            const wk = document.getElementById("weekSelect").value;
+            const yr = document.getElementById("bulkYearSelect").value;
+            const mo = document.getElementById("bulkMonthSelect").value;
+            const wk = document.getElementById("bulkWeekSelect").value;
             
             if (!db[yr]) db[yr] = {};
             if (!db[yr][mo]) db[yr][mo] = {};
@@ -6416,7 +6489,14 @@ const CHARACTERS = [
             });
             
             saveDB();
-            renderTable();
+
+            // If the week just imported into is also the one currently shown on the main
+            // Speak Up Hour table, refresh that table too so the new words appear immediately.
+            const mainYr = document.getElementById("yearSelect").value;
+            const mainMo = document.getElementById("monthSelect").value;
+            const mainWk = document.getElementById("weekSelect").value;
+            if (yr === mainYr && mo === mainMo && wk === mainWk) renderTable();
+
             closeBulkImportModal();
             alert(`Success! ${parsedBulkData.length} vocabulary entries were added to ${wk} - ${mo} ${yr}!`);
         }
@@ -7603,24 +7683,69 @@ const CHARACTERS = [
             html2pdf().set(opt).from(el).save();
         }
         
+        // The modal has its OWN Year/Month/Week selectors (editTopicYearSelect/
+        // editTopicMonthSelect/editTopicWeekSelect) so an Admin can retitle ANY week
+        // without leaving this modal / bouncing back to the Speak Up Hour tab. They
+        // default to whatever the main page is currently showing, but can be changed
+        // freely inside the modal — the topic text box always reloads to match whichever
+        // week is picked in the modal.
         function openEditTopicModal() {
-            const yr = document.getElementById("yearSelect").value;
-            const mo = document.getElementById("monthSelect").value;
-            const wk = document.getElementById("weekSelect").value;
-            if (!db[yr] || !db[yr][mo] || !db[yr][mo][wk]) return;
-            
-            document.getElementById("editTopicInput").value = db[yr][mo][wk].title;
+            const yrSel = document.getElementById("editTopicYearSelect");
+            yrSel.innerHTML = "";
+            YEARS.forEach(y => yrSel.appendChild(new Option(y, y)));
+            const mainYear = document.getElementById("yearSelect").value;
+            if (mainYear && YEARS.includes(mainYear)) yrSel.value = mainYear;
+
+            onEditTopicYearChange(document.getElementById("monthSelect").value, document.getElementById("weekSelect").value);
             document.getElementById("editTopicModal").classList.remove("hidden");
+        }
+
+        function onEditTopicYearChange(preferredMonth, preferredWeek) {
+            const moSel = document.getElementById("editTopicMonthSelect");
+            const wantedMonth = preferredMonth !== undefined ? preferredMonth : moSel.value;
+            moSel.innerHTML = "";
+            MONTH_NAMES.forEach(m => moSel.appendChild(new Option(m, m)));
+            if (wantedMonth && MONTH_NAMES.includes(wantedMonth)) moSel.value = wantedMonth;
+            onEditTopicMonthChange(preferredWeek);
+        }
+
+        function onEditTopicMonthChange(preferredWeek) {
+            const wkSel = document.getElementById("editTopicWeekSelect");
+            const wantedWeek = preferredWeek !== undefined ? preferredWeek : wkSel.value;
+            wkSel.innerHTML = "";
+            WEEKS.forEach(w => wkSel.appendChild(new Option(w, w)));
+            if (wantedWeek && WEEKS.includes(wantedWeek)) wkSel.value = wantedWeek;
+            onEditTopicWeekChange();
+        }
+
+        // Reloads the topic text box to match whichever week is currently picked in the modal.
+        function onEditTopicWeekChange() {
+            const yr = document.getElementById("editTopicYearSelect").value;
+            const mo = document.getElementById("editTopicMonthSelect").value;
+            const wk = document.getElementById("editTopicWeekSelect").value;
+            const existing = db[yr] && db[yr][mo] && db[yr][mo][wk] ? db[yr][mo][wk].title : `${mo} ${yr} - ${wk}`;
+            document.getElementById("editTopicInput").value = existing;
         }
         
         function saveEditedTopic() {
-            const yr = document.getElementById("yearSelect").value;
-            const mo = document.getElementById("monthSelect").value;
-            const wk = document.getElementById("weekSelect").value;
+            const yr = document.getElementById("editTopicYearSelect").value;
+            const mo = document.getElementById("editTopicMonthSelect").value;
+            const wk = document.getElementById("editTopicWeekSelect").value;
+
+            if (!db[yr]) db[yr] = {};
+            if (!db[yr][mo]) db[yr][mo] = {};
+            if (!db[yr][mo][wk]) db[yr][mo][wk] = { title: `${mo} ${yr} - ${wk}`, words: [] };
             
             db[yr][mo][wk].title = document.getElementById("editTopicInput").value;
             saveDB();
-            renderTable();
+
+            // If the week just retitled is also the one currently shown on the main
+            // Speak Up Hour table, refresh that table too so the new title appears immediately.
+            const mainYr = document.getElementById("yearSelect").value;
+            const mainMo = document.getElementById("monthSelect").value;
+            const mainWk = document.getElementById("weekSelect").value;
+            if (yr === mainYr && mo === mainMo && wk === mainWk) renderTable();
+
             document.getElementById("editTopicModal").classList.add("hidden");
         }
     </script>
